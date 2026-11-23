@@ -4,12 +4,10 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from waku_agent_harness.llm import SYSTEM_PROMPT
 from waku_agent_harness.tools.bash import BASH_TOOL, run_bash
 from waku_agent_harness.tools.read_file import READ_FILE_TOOL, read_file
 
-SYSTEM_PROMPT = """You are a coding agent. Answer clearly and concisely.
-Use read_file to inspect text files and bash when you need shell commands. Report your findings to the user.
-If a command is denied, respect the decision and do not retry it without a new request."""
 
 
 def main():

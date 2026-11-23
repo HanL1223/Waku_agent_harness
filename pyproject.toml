@@ -13,8 +13,23 @@ dependencies = [
 ]
 
 [project.scripts]
-waku-agent-harness = "waku_agent_harness:main"
+waku = "waku_agent_harness.cli:main"
+waku-agent-harness = "waku_agent_harness.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.9,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.6",
+]
+
+# Lint/format settings, used by `ruff` and the python-lint skill (.agents/skills/python-lint).
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# E/F: pycodestyle errors + pyflakes (real bugs), I: import order,
+# UP: modern Python syntax, B: bugbear (likely bugs and bad patterns).
+select = ["E", "F", "I", "UP", "B"]
