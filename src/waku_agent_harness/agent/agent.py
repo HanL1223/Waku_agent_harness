@@ -15,11 +15,19 @@ from waku_agent_harness.llm import SYSTEM_PROMPT, call_llm
 from waku_agent_harness.skills.skills import READ_SKILL_TOOL, read_skill, skills_prompt
 from waku_agent_harness.tools.bash import BASH_TOOL, run_bash
 from waku_agent_harness.tools.read_file import READ_FILE_TOOL, read_file
+from waku_agent_harness.tools.str_replace import STR_REPLACE_TOOL, str_replace
+from waku_agent_harness.tools.write_file import WRITE_FILE_TOOL, write_file
 
-TOOLS = [BASH_TOOL, READ_FILE_TOOL, READ_SKILL_TOOL]
+TOOLS = [BASH_TOOL, READ_FILE_TOOL, WRITE_FILE_TOOL, STR_REPLACE_TOOL, READ_SKILL_TOOL]
 
-# Each tool takes one string argument; this is its name in the tool's JSON schema.
-TOOL_ARGS = {"bash": "command", "read_file": "path", "read_skill": "name"}
+# Each tool's string arguments (names from its JSON schema), in the order its function takes them.
+TOOL_ARGS = {
+    "bash": ("command",),
+    "read_file": ("path",),
+    "write_file": ("path", "content"),
+    "str_replace": ("path", "old_str", "new_str"),
+    "read_skill": ("name",),
+}
 
 
 class AgentUI:
@@ -44,8 +52,10 @@ class AgentUI:
     def tool_result(self, name: str, result: str) -> None:
         """A tool finished; `result` is exactly what the model will see."""
 
-    def approve(self, command: str) -> bool:
-        """Asked before a shell command that is not read-only. Return True to allow it."""
+    def approve(self, request: str, title: str = "Run this command?") -> bool:
+        """Asked before a risky action: a shell command that is not read-only (`request` is the
+        command) or a file change (`request` is a unified diff, `title` names the file).
+        Return True to allow it."""
         return False
 
 
@@ -70,17 +80,23 @@ def run_tool(call, approve) -> str:
         arguments = json.loads(call.function.arguments)
         if not isinstance(arguments, dict):
             raise ValueError("Expected an object of arguments")
-        value = arguments.get(TOOL_ARGS[name])
-        if not isinstance(value, str):
-            raise ValueError(f"Expected a string {TOOL_ARGS[name]}")
+        values = []
+        for arg in TOOL_ARGS[name]:
+            if not isinstance(arguments.get(arg), str):
+                raise ValueError(f"Expected a string {arg}")
+            values.append(arguments[arg])
     except (ValueError, TypeError) as error:
         return f"Invalid tool request: {error}"
 
     if name == "bash":
-        return run_bash(value, approve=approve)
+        return run_bash(*values, approve=approve)
+    if name == "write_file":
+        return write_file(*values, approve=approve)
+    if name == "str_replace":
+        return str_replace(*values, approve=approve)
     if name == "read_skill":
-        return read_skill(value)
-    return read_file(value)
+        return read_skill(*values)
+    return read_file(*values)
 
 
 def run_turn(messages: list, user_input: str, ui: AgentUI) -> str:

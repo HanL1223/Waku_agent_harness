@@ -98,11 +98,11 @@ class RichUI(AgentUI):
         # "└ " then the preview, indented under the tool call.
         console.print(Text("  └ ", style="dim") + Text(shown.replace("\n", "\n    "), style="dim"))
 
-    def approve(self, command: str) -> bool:
+    def approve(self, request: str, title: str = "Run this command?") -> bool:
         if self.auto_approve:
-            console.print(Text("  (auto-approved with --yes)", style="yellow"))
+            console.print(Text(f"  (auto-approved with --yes: {title})", style="yellow"))
             return True
-        console.print(Panel(Text(command), title="Run this command?", border_style="yellow", expand=False))
+        console.print(Panel(colorize_diff(request), title=title, border_style="yellow", expand=False))
         try:
             return Confirm.ask("Approve", default=False, console=console)
         except EOFError:  # stdin is not a terminal, so nobody can answer
@@ -126,20 +126,54 @@ class JsonUI(AgentUI):
     def tool_result(self, name: str, result: str) -> None:
         self.steps[-1]["result"] = result
 
-    def approve(self, command: str) -> bool:
-        # Can't prompt in JSON mode: only --yes allows commands that need approval.
+    def approve(self, request: str, title: str = "Run this command?") -> bool:
+        # Can't prompt in JSON mode: only --yes allows actions that need approval.
         return self.auto_approve
 
 
 def summarize_arguments(arguments: str) -> str:
-    """Show `{"command": "ls -la"}` as just `ls -la` (our tools take one argument)."""
+    """One line for the tool-call header.
+
+    `{"command": "ls -la"}` -> `ls -la`; for the file tools, the path plus the size of each
+    text argument (`src/a.py  content: 12 lines`), since the full text appears in the diff.
+    """
     try:
         parsed = json.loads(arguments)
     except ValueError:
         return arguments
-    if isinstance(parsed, dict) and len(parsed) == 1:
+    if not isinstance(parsed, dict):
+        return arguments
+    if len(parsed) == 1:
         return str(next(iter(parsed.values())))
+    if isinstance(parsed.get("path"), str):
+        sizes = [
+            f"{key}: {len(value.splitlines())} lines"
+            for key, value in parsed.items()
+            if key != "path" and isinstance(value, str)
+        ]
+        return "  ".join([parsed["path"], *sizes])
     return arguments
+
+
+def colorize_diff(text: str) -> Text:
+    """Color a unified diff (+ green, - red, @@ cyan). Other text, like a shell command, stays plain."""
+    if not text.startswith("--- "):
+        return Text(text)
+    out = Text()
+    for line in text.splitlines():
+        if line.startswith(("+++", "---")):
+            style = "bold"
+        elif line.startswith("+"):
+            style = "green"
+        elif line.startswith("-"):
+            style = "red"
+        elif line.startswith("@@"):
+            style = "cyan"
+        else:
+            style = ""
+        out.append(line + "\n", style=style)
+    out.rstrip()
+    return out
 
 
 # --------------------------------------------------------------------------- commands

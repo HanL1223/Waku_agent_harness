@@ -34,6 +34,7 @@ FORBIDDEN_ARGS = {
     "rg": ("--pre",),
     "git": ("--output", "--ext-diff", "--textconv"),
 }
+TIMEOUT_SECONDS = 600  # long enough for browser automation (ego-browser) scripts
 # Characters that enable redirection, substitution, chaining or hidden extra lines.
 UNSAFE_CHARS = set(";&<>`$()\n\r")
 
@@ -88,9 +89,9 @@ def run_bash(command: str, approve=ask_in_terminal) -> str:
     if not is_read_only(command) and not approve(command):
         return "Command denied by user."
     try:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
-        return "Command timed out after 30 seconds."
+        return f"Command timed out after {TIMEOUT_SECONDS} seconds."
     except OSError as error:
         return f"Could not run command: {error}"
     return f"Exit code: {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
