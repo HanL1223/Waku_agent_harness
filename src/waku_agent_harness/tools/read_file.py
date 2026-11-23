@@ -1,6 +1,6 @@
 """Read text files within the current project directory."""
 
-from pathlib import Path
+from waku_agent_harness.tools.files import project_path
 
 MAX_BYTES = 64 * 1024
 
@@ -21,10 +21,7 @@ READ_FILE_TOOL = {
 
 def read_file(path: str) -> str:
     try:
-        root = Path.cwd().resolve()
-        target = (root / path).resolve()
-        if not target.is_relative_to(root):
-            return "Error: path is outside the project directory."
+        target = project_path(path)
         with target.open("rb") as file:
             data = file.read(MAX_BYTES + 1)
         truncated = len(data) > MAX_BYTES
